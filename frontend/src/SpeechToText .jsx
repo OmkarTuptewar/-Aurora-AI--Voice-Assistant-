@@ -3,72 +3,104 @@ import React, { useState, useRef } from 'react';
 const SpeechToText = () => {
   const [status, setStatus] = useState('Not Connected');
   const [transcript, setTranscript] = useState('');
+  const [response, setResponse] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const socketRef = useRef(null);
 
+ 
   const startRecording = async () => {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      console.error('MediaDevices or MediaRecorder not supported.');
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
 
-      const socket = new WebSocket("ws://localhost:4000"); 
-      socketRef.current = socket;
-
-      socket.onopen = () => {
-        setStatus('Connected');
-        mediaRecorder.start(1000);
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
-            socket.send(event.data);
-          }
-        };
-      };
-
-      socket.onmessage = async (event) => {
-        if (typeof event.data === 'object' && event.data instanceof Blob) {
-        
-          const text = await event.data.text();
-          try {
-            const message = JSON.parse(text);
-            console.log('Message received from WebSocket:', message);
-      
-            if (message.channel && message.channel.alternatives[0].transcript) {
-              setTranscript((prev) => prev + message.channel.alternatives[0].transcript + ' ');
-            }
-          } catch (error) {
-            console.error('Error parsing message:', error);
-          }
-        } else {
-          console.error('Unexpected message format:', event.data);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+          socketRef.current.send(event.data);
         }
       };
-      socket.onclose = () => {
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+     
+      socketRef.current = new WebSocket('ws://localhost:4000');
+
+      socketRef.current.onopen = () => {
+        setStatus('Connected');
+      };
+
+      socketRef.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'response') {
+          setResponse(data.text);
+          playTextToSpeech(data.text);  
+        } else {
+          setTranscript((prev) => prev + data.text + ' ');
+        }
+      };
+
+      socketRef.current.onclose = () => {
         setStatus('Disconnected');
       };
 
-      socket.onerror = (error) => {
+      socketRef.current.onerror = (error) => {
         console.error('WebSocket error:', error);
         setStatus('Error');
       };
 
-      setIsRecording(true);
     } catch (error) {
-      console.error('Error in startRecording:', error);
+      console.error('Error starting recording:', error);
+      setStatus('Error');
     }
   };
 
+ 
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.close();
-    }
-    setIsRecording(false);
   };
+
+ 
+  const playTextToSpeech = async (text) => {
+    try {
+      const response = await fetch('https://api.deepgram.com/v1/speech:synthesize', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Token 7374d7090286b0933306741ab40ec25db706165f', 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+  
+    
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      const audioUrl = data.audio_url;
+  
+     
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.play();
+      } else {
+        console.error('No audio URL returned from Deepgram.');
+      }
+    } catch (error) {
+      console.error('Error fetching text-to-speech audio:', error);
+    }
+  };
+  
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-gray-700 to-gray-900 p-4">
@@ -79,6 +111,11 @@ const SpeechToText = () => {
         <div className="bg-gray-100 p-4 rounded-lg h-40 overflow-y-auto mb-4 border-2 border-gray-300">
           <p id="transcript" className="text-gray-800 whitespace-pre-wrap">
             {transcript || 'Your transcript will appear here...'}
+          </p>
+        </div>
+        <div className="bg-gray-100 p-4 rounded-lg h-40 overflow-y-auto mb-4 border-2 border-gray-300">
+          <p id="response" className="text-gray-800 whitespace-pre-wrap">
+            {response || 'Response from GROQ will appear here...'}
           </p>
         </div>
         <div className="flex space-x-4">

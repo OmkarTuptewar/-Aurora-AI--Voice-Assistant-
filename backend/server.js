@@ -1,48 +1,42 @@
+// server.js (or your server file)
 const express = require('express');
-const WebSocket = require('ws');
 const http = require('http');
+const WebSocket = require('ws');
 const dotenv = require('dotenv');
-dotenv.config();
+const { getGroqChatCompletion } = require('./groqClient'); 
 
+dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 4000;
-
-const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY || 'your-deepgram-api-key';
-const DEEPGRAM_API_URL = 'wss://api.deepgram.com/v1/listen';
-
 
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
-  const deepgramSocket = new WebSocket(DEEPGRAM_API_URL, {
-    headers: {
-      Authorization: `Token ${DEEPGRAM_API_KEY}`,
-    },
-  });
+  ws.on('message', async (message) => {
+    const text = message.toString();
 
- 
-  deepgramSocket.on('message', (message) => {
-    console.log('Message from Deepgram:', message);
-    ws.send(message);
-  });
+    try {
+      // Fetch response from GROQ based on the text
+      const response = await getGroqChatCompletion(text);
+      const responseText = response.choices[0]?.message?.content || "No response";
 
- 
-  ws.on('message', (message) => {
-    if (deepgramSocket.readyState === WebSocket.OPEN) {
-      deepgramSocket.send(message);
+      // Send response back to the client
+      ws.send(JSON.stringify({ type: 'response', text: responseText }));
+    } catch (error) {
+      console.error('Error fetching response:', error);
+      ws.send(JSON.stringify({ type: 'response', text: 'Error fetching response' }));
     }
   });
 
   ws.on('close', () => {
-    deepgramSocket.close();
     console.log('Client disconnected');
   });
 
-  deepgramSocket.on('error', (error) => {
-    console.error('Deepgram WebSocket error:', error);
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
   });
 });
 
