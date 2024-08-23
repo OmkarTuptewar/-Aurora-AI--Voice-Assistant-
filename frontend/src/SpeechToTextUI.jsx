@@ -3,10 +3,11 @@ import React from 'react';
 const SpeechToTextUI = ({
   status,
   transcript,
-  responseText, // Add this prop to receive the response text
+  responseText,
   isRecording,
   startRecording,
   stopRecording,
+  audioUrl, 
 }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-gray-700 to-gray-900 p-4">
@@ -24,6 +25,11 @@ const SpeechToTextUI = ({
             {responseText || 'Generated response will appear here...'}
           </p>
         </div>
+        {audioUrl && (
+          <div className="mb-4">
+            <audio src={audioUrl} controls autoPlay />
+          </div>
+        )}
         <div className="flex space-x-4">
           <button
             onClick={startRecording}
@@ -50,4 +56,3 @@ const SpeechToTextUI = ({
 };
 
 export default SpeechToTextUI;
-    

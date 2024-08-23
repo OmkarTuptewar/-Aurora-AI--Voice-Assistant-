@@ -5,8 +5,9 @@ import axios from 'axios';
 const SpeechToText = () => {
   const [status, setStatus] = useState('Not Connected');
   const [transcript, setTranscript] = useState('');
-  const [responseText, setResponseText] = useState(''); // State to store the response text
+  const [responseText, setResponseText] = useState(''); 
   const [isRecording, setIsRecording] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
   const mediaRecorderRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -36,22 +37,28 @@ const SpeechToText = () => {
           try {
             const message = JSON.parse(text);
             console.log('Message received from WebSocket:', message);
-      
+  
             if (message.channel && message.channel.alternatives[0].transcript) {
               const newTranscript = message.channel.alternatives[0].transcript + ' ';
               setTranscript((prev) => prev + newTranscript);
-      
-              // Send the new transcript to the backend API
+  
+              // Send to backend API
               const response = await axios.post('http://localhost:4000/api/generate-content', {
                 transcript: newTranscript,
               });
-      
-              console.log('Response from API:', response.data); // Log the entire response
-      
-              // Extract and set the response text
+  
+              console.log('Response from API:', response.data); 
+
+              
+  
+              // seted the response text
               const responseText = response.data.choices[0]?.message?.content;
               if (responseText) {
                 setResponseText((prev) => prev + responseText + '\n');
+
+
+                // audio from the response text
+                await generateAudio(responseText);
               } else {
                 console.error('Response content is undefined or empty');
               }
@@ -63,7 +70,6 @@ const SpeechToText = () => {
           console.error('Unexpected message format:', event.data);
         }
       };
-      
 
       socket.onclose = () => {
         setStatus('Disconnected');
@@ -90,14 +96,33 @@ const SpeechToText = () => {
     setIsRecording(false);
   };
 
+  const generateAudio = async (text) => {
+    try {
+      const response = await axios.post('http://localhost:4000/generate-audio', {
+        text,
+      }, { responseType: 'blob' });
+
+      if (response.status === 200) {
+        const audioBlob = response.data;
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setAudioUrl(audioUrl);
+      } else {
+        console.error('Error generating audio:', response.status);
+      }
+    } catch (error) {
+      console.error('Error generating audio:', error);
+    }
+  };
+
   return (
     <SpeechToTextUI
       status={status}
       transcript={transcript}
-      responseText={responseText} // Pass the response text to the UI component
+      responseText={responseText} 
       isRecording={isRecording}
       startRecording={startRecording}
       stopRecording={stopRecording}
+      audioUrl={audioUrl} 
     />
   );
 };
