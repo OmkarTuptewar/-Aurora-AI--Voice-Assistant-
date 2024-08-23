@@ -1,8 +1,11 @@
 import React, { useState, useRef } from 'react';
+import SpeechToTextUI from './SpeechToTextUI';
+import axios from 'axios';
 
 const SpeechToText = () => {
   const [status, setStatus] = useState('Not Connected');
   const [transcript, setTranscript] = useState('');
+  const [responseText, setResponseText] = useState(''); // State to store the response text
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const socketRef = useRef(null);
@@ -29,14 +32,29 @@ const SpeechToText = () => {
 
       socket.onmessage = async (event) => {
         if (typeof event.data === 'object' && event.data instanceof Blob) {
-        
           const text = await event.data.text();
           try {
             const message = JSON.parse(text);
             console.log('Message received from WebSocket:', message);
       
             if (message.channel && message.channel.alternatives[0].transcript) {
-              setTranscript((prev) => prev + message.channel.alternatives[0].transcript + ' ');
+              const newTranscript = message.channel.alternatives[0].transcript + ' ';
+              setTranscript((prev) => prev + newTranscript);
+      
+              // Send the new transcript to the backend API
+              const response = await axios.post('http://localhost:4000/api/generate-content', {
+                transcript: newTranscript,
+              });
+      
+              console.log('Response from API:', response.data); // Log the entire response
+      
+              // Extract and set the response text
+              const responseText = response.data.choices[0]?.message?.content;
+              if (responseText) {
+                setResponseText((prev) => prev + responseText + '\n');
+              } else {
+                console.error('Response content is undefined or empty');
+              }
             }
           } catch (error) {
             console.error('Error parsing message:', error);
@@ -45,6 +63,8 @@ const SpeechToText = () => {
           console.error('Unexpected message format:', event.data);
         }
       };
+      
+
       socket.onclose = () => {
         setStatus('Disconnected');
       };
@@ -71,38 +91,14 @@ const SpeechToText = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-gray-700 to-gray-900 p-4">
-      <div className="bg-white shadow-2xl rounded-xl p-8 max-w-lg w-full transform transition-all duration-500 scale-125">
-        <p className="text-lg font-extrabold text-gray-700 mb-4" id="status">
-          Status: {status}
-        </p>
-        <div className="bg-gray-100 p-4 rounded-lg h-40 overflow-y-auto mb-4 border-2 border-gray-300">
-          <p id="transcript" className="text-gray-800 whitespace-pre-wrap">
-            {transcript || 'Your transcript will appear here...'}
-          </p>
-        </div>
-        <div className="flex space-x-4">
-          <button
-            onClick={startRecording}
-            disabled={isRecording}
-            className={`px-6 py-3 bg-gradient-to-r from-teal-500 to-blue-600 text-white rounded-full font-semibold transform transition-all duration-300 ${
-              isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-            }`}
-          >
-            Start Recording
-          </button>
-          <button
-            onClick={stopRecording}
-            disabled={!isRecording}
-            className={`px-6 py-3 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-full font-semibold transform transition-all duration-300 ${
-              !isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-            }`}
-          >
-            Stop Recording
-          </button>
-        </div>
-      </div>
-    </div>
+    <SpeechToTextUI
+      status={status}
+      transcript={transcript}
+      responseText={responseText} // Pass the response text to the UI component
+      isRecording={isRecording}
+      startRecording={startRecording}
+      stopRecording={stopRecording}
+    />
   );
 };
 
