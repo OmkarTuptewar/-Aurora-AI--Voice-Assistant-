@@ -1,4 +1,4 @@
-# speech_to_text_deepgram
+# AI Voice Assistant
 
 Built an AI Voice Assistant: Used MERN stack, Deepgram STT/TTS, and Groq API for real-time audio processing and intelligent responses.
 
