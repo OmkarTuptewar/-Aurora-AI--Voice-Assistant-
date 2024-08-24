@@ -32,7 +32,7 @@ wss.on('connection', (ws) => {
   });
 
   deepgramSocket.on('message', (message) => {
-    console.log('Message from Deepgram:', message);
+    // console.log('Message from Deepgram:', message);
     ws.send(message);
   });
 
