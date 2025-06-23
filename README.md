@@ -9,4 +9,8 @@ User-Friendly UI: Created a responsive React frontend with start/stop recording 
 End-to-End Solution: Developed a full-stack app for capturing, processing, and responding to user audio input.
 
 
-![image](https://github.com/user-attachments/assets/923b5ed2-dece-4914-9dfc-12bad41894ee)
+
+
+
+https://github.com/user-attachments/assets/18fdd270-9eee-4dee-9ed8-662be3369ff2
+
